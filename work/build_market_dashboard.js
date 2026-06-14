@@ -3,6 +3,7 @@ const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
 const OUTPUT = path.join(ROOT, "outputs", "a_share_20y_dashboard.html");
+const ROOT_INDEX = path.join(ROOT, "index.html");
 const START = "2006-06-05";
 const END = "2026-06-05";
 
@@ -298,8 +299,8 @@ chart.setOption({
   ]
 });
 
-document.querySelectorAll("[data-years]").forEach(btn => btn.addEventListener("click", () => {
-  document.querySelectorAll("[data-years]").forEach(b => b.classList.remove("active"));
+document.querySelectorAll(".ranges [data-years]").forEach(btn => btn.addEventListener("click", () => {
+  document.querySelectorAll(".ranges [data-years]").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   const years = Number(btn.dataset.years);
   const end = new Date("2026-06-05T00:00:00Z");
@@ -317,9 +318,14 @@ async function main() {
   const { execFileSync } = require("child_process");
   const python = process.env.CODEX_PYTHON ||
     "C:\\Users\\leeji\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe";
-  execFileSync(python, [path.join(ROOT, "work", "fetch_valuation_data.py")], {
-    stdio: "inherit",
-  });
+  try {
+    execFileSync(python, [path.join(ROOT, "work", "fetch_valuation_data.py")], {
+      stdio: "inherit",
+    });
+  } catch (error) {
+    if (!fs.existsSync(path.join(ROOT, "work", "valuation_data.json"))) throw error;
+    console.warn("Valuation refresh failed; using the existing valuation_data.json cache.");
+  }
   const [shPrices, szPrices] = await Promise.all([
     fetchPrices("1.000001"),
     fetchPrices("0.399001"),
@@ -333,8 +339,12 @@ async function main() {
   fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
   fs.writeFileSync(OUTPUT, htmlTemplate(data, echartsSource), "utf8");
   require("./add_valuation_module");
+  require("./add_retail_sentiment_module");
+  require("./add_large_money_sentiment_module");
+  fs.copyFileSync(OUTPUT, ROOT_INDEX);
   console.log(JSON.stringify({
     output: OUTPUT,
+    rootIndex: ROOT_INDEX,
     bytes: fs.statSync(OUTPUT).size,
     shPoints: sh.length,
     szPoints: sz.length,
