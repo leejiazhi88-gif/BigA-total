@@ -9,19 +9,20 @@
 - 散户情绪事件 List：按年份和季度切换查看开户、基金、融资监管与极端情绪事件
 - 情绪-大资金模块：大宗交易、机构席位大宗净买入、产业资本增减持、北向资金历史口径
 
+换机同步、线上地址、部署与本地运行说明见 [HANDOFF.md](HANDOFF.md)。
+
 ## 运行
 
 生成页面：
 
 ```powershell
-$env:CODEX_PYTHON="C:\Users\leeji\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
-& "C:\Users\leeji\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" ".\work\build_market_dashboard.js"
+node ./work/build_market_dashboard.js
 ```
 
 本地预览：
 
 ```powershell
-& "C:\Users\leeji\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" ".\work\preview_server.js"
+node ./work/preview_server.js
 ```
 
 然后打开：

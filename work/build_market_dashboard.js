@@ -315,9 +315,19 @@ window.addEventListener("resize", () => chart.resize());
 }
 
 async function main() {
-  const { execFileSync } = require("child_process");
-  const python = process.env.CODEX_PYTHON ||
-    "C:\\Users\\leeji\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe";
+  const { execFileSync, spawnSync } = require("child_process");
+  const candidates = [
+    process.env.CODEX_PYTHON,
+    process.env.PYTHON,
+    "python3",
+    "python",
+  ].filter(Boolean);
+  const python = candidates.find((cmd) =>
+    spawnSync(cmd, ["--version"], { stdio: "ignore" }).status === 0
+  );
+  if (!python) {
+    throw new Error("Unable to find a usable Python interpreter");
+  }
   try {
     execFileSync(python, [path.join(ROOT, "work", "fetch_valuation_data.py")], {
       stdio: "inherit",
