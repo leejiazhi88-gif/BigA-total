@@ -35,6 +35,8 @@ http://127.0.0.1:9876
 
 - `outputs/a_share_20y_dashboard.html`：生成后的仪表盘
 - `work/build_market_dashboard.js`：总览生成入口
+- `work/fetch_market_overview_data.py`：总览价格、PE(TTM)、滚动盈利数据更新脚本
+- `work/market_overview_data.json`：总览数据缓存
 - `work/add_valuation_module.js`：估值模块注入脚本
 - `work/fetch_valuation_data.py`：PB、股债收益差数据更新脚本
 - `work/valuation_data.json`：估值扩展数据缓存

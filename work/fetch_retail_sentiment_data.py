@@ -11,6 +11,7 @@ CONFIG = Path.home() / ".codex" / "config.toml"
 OUTPUT = ROOT / "work" / "retail_sentiment_data.json"
 START_YEAR = 2016
 END_YEAR = 2026
+END_DATE = "20260702"
 
 
 def get_token():
@@ -42,6 +43,7 @@ def call_api(token, api_name, params, fields):
 def yearly(token, api_name, base_params, fields, start_year=START_YEAR):
     rows = []
     for year in range(start_year, END_YEAR + 1):
+        end_date = END_DATE if year == END_YEAR else f"{year}1231"
         rows.extend(
             call_api(
                 token,
@@ -49,7 +51,7 @@ def yearly(token, api_name, base_params, fields, start_year=START_YEAR):
                 {
                     **base_params,
                     "start_date": f"{year}0101",
-                    "end_date": f"{year}1231",
+                    "end_date": end_date,
                 },
                 fields,
             )
@@ -61,12 +63,12 @@ def monthly_limit_counts(token):
     counts = defaultdict(int)
     for year in range(2020, END_YEAR + 1):
         for month in range(1, 13):
-            if year == END_YEAR and month > 6:
+            if f"{year}{month:02d}01" > END_DATE:
                 break
             start = f"{year}{month:02d}01"
             next_year = year + (month == 12)
             next_month = 1 if month == 12 else month + 1
-            end = datetime(next_year, next_month, 1).strftime("%Y%m%d")
+            end = min(datetime(next_year, next_month, 1).strftime("%Y%m%d"), END_DATE)
             rows = call_api(
                 token,
                 "limit_list_d",

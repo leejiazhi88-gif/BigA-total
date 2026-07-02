@@ -5,53 +5,10 @@ const ROOT = path.resolve(__dirname, "..");
 const OUTPUT = path.join(ROOT, "outputs", "a_share_20y_dashboard.html");
 const ROOT_INDEX = path.join(ROOT, "index.html");
 const START = "2006-06-05";
-const END = "2026-06-05";
+const END = "2026-07-02";
 
-function extractPe(file) {
-  const html = fs.readFileSync(file, "utf8");
-  const datesMatch = html.match(/var xSeryAcm\s*=\s*(\[[\s\S]*?\]);\s*var ySeriesAcm/);
-  const seriesMatch = html.match(/var ySeriesAcm\s*=\s*(\[[\s\S]*?\]);\s*lineAverageChart/);
-  if (!datesMatch || !seriesMatch) throw new Error(`Unable to parse ${file}`);
-  const dates = JSON.parse(datesMatch[1]).map(String).map((d) =>
-    `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`
-  );
-  const values = JSON.parse(seriesMatch[1])[0].figures.map(Number);
-  return new Map(dates.map((date, i) => [date, values[i]]));
-}
-
-async function fetchPrices(secid) {
-  const url = new URL("https://push2his.eastmoney.com/api/qt/stock/kline/get");
-  url.search = new URLSearchParams({
-    secid,
-    klt: "101",
-    fqt: "0",
-    beg: START.replaceAll("-", ""),
-    end: END.replaceAll("-", ""),
-    fields1: "f1,f2,f3,f4,f5,f6",
-    fields2: "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
-  });
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Price request failed: ${response.status}`);
-  const json = await response.json();
-  return json.data.klines.map((line) => {
-    const [date, , close] = line.split(",");
-    return { date, close: Number(close) };
-  });
-}
-
-function combine(prices, peMap) {
-  return prices
-    .map(({ date, close }) => {
-      const pe = peMap.get(date);
-      if (!Number.isFinite(pe) || pe <= 0) return null;
-      return {
-        date,
-        close,
-        pe,
-        earnings: close / pe,
-      };
-    })
-    .filter(Boolean);
+function readMarketOverview() {
+  return JSON.parse(fs.readFileSync(path.join(ROOT, "work", "market_overview_data.json"), "utf8"));
 }
 
 function lastByWeek(rows) {
@@ -74,7 +31,9 @@ function lastByWeek(rows) {
 
 function stats(rows) {
   const latest = rows[rows.length - 1];
-  const oneYearAgo = rows.find((row) => row.date >= "2025-06-05") || rows[0];
+  const oneYearAgoDate = new Date(`${END}T00:00:00Z`);
+  oneYearAgoDate.setUTCFullYear(oneYearAgoDate.getUTCFullYear() - 1);
+  const oneYearAgo = rows.find((row) => row.date >= oneYearAgoDate.toISOString().slice(0, 10)) || rows[0];
   const peSorted = rows.map((row) => row.pe).sort((a, b) => a - b);
   const rank = peSorted.filter((value) => value <= latest.pe).length / peSorted.length;
   return {
@@ -179,7 +138,7 @@ function htmlTemplate(data, echartsSource) {
       <h1>A股20年：股价、滚动盈利与市盈率</h1>
       <div class="subtitle">上证综指 × 深证成指，共享同一时间横轴</div>
     </div>
-    <div class="asof">数据区间：2006-06-05 至 2026-06-05<br>周频展示，底层数据为交易日数据</div>
+    <div class="asof">数据区间：${START} 至 ${END}<br>周频展示，底层数据为交易日数据</div>
   </header>
   <section class="cards" id="cards"></section>
   <section>
@@ -303,10 +262,10 @@ document.querySelectorAll(".ranges [data-years]").forEach(btn => btn.addEventLis
   document.querySelectorAll(".ranges [data-years]").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   const years = Number(btn.dataset.years);
-  const end = new Date("2026-06-05T00:00:00Z");
+  const end = new Date("${END}T00:00:00Z");
   const start = new Date(end);
   start.setUTCFullYear(start.getUTCFullYear() - years);
-  chart.dispatchAction({ type: "dataZoom", startValue: start.toISOString().slice(0,10), endValue: "2026-06-05" });
+  chart.dispatchAction({ type: "dataZoom", startValue: start.toISOString().slice(0,10), endValue: "${END}" });
 }));
 window.addEventListener("resize", () => chart.resize());
 </script>
@@ -329,6 +288,9 @@ async function main() {
     throw new Error("Unable to find a usable Python interpreter");
   }
   try {
+    execFileSync(python, [path.join(ROOT, "work", "fetch_market_overview_data.py")], {
+      stdio: "inherit",
+    });
     execFileSync(python, [path.join(ROOT, "work", "fetch_valuation_data.py")], {
       stdio: "inherit",
     });
@@ -336,14 +298,9 @@ async function main() {
     if (!fs.existsSync(path.join(ROOT, "work", "valuation_data.json"))) throw error;
     console.warn("Valuation refresh failed; using the existing valuation_data.json cache.");
   }
-  const [shPrices, szPrices] = await Promise.all([
-    fetchPrices("1.000001"),
-    fetchPrices("0.399001"),
-  ]);
-  const shPe = extractPe(path.join(ROOT, "work", "99rising_sh_pettm.html"));
-  const szPe = extractPe(path.join(ROOT, "work", "99rising_sz_pettm.html"));
-  const sh = lastByWeek(combine(shPrices, shPe));
-  const sz = lastByWeek(combine(szPrices, szPe));
+  const overview = readMarketOverview();
+  const sh = lastByWeek(overview.sh);
+  const sz = lastByWeek(overview.sz);
   const echartsSource = fs.readFileSync(path.join(ROOT, "work", "echarts.min.js"), "utf8");
   const data = { sh, sz, stats: { sh: stats(sh), sz: stats(sz) } };
   fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });

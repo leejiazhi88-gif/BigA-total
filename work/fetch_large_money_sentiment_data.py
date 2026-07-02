@@ -12,6 +12,7 @@ CONFIG = Path.home() / ".codex" / "config.toml"
 OUTPUT = ROOT / "work" / "large_money_sentiment_data.json"
 START_YEAR = 2018
 END_YEAR = 2026
+END_DATE = "20260702"
 
 
 def get_token():
@@ -43,10 +44,13 @@ def call_api(token, api_name, params, fields):
 def month_ranges():
     for year in range(START_YEAR, END_YEAR + 1):
         for month in range(1, 13):
-            if year == END_YEAR and month > 6:
+            if year == END_YEAR and month > int(END_DATE[4:6]):
                 return
             last = calendar.monthrange(year, month)[1]
-            yield f"{year}{month:02d}01", f"{year}{month:02d}{last:02d}"
+            end = f"{year}{month:02d}{last:02d}"
+            if year == END_YEAR and month == int(END_DATE[4:6]):
+                end = END_DATE
+            yield f"{year}{month:02d}01", end
 
 
 def week_key(date):
