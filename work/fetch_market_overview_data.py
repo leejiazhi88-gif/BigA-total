@@ -60,25 +60,35 @@ def fetch_by_year(token, api_name, ts_code, fields):
 
 def build_market(token, ts_code):
     prices = fetch_by_year(token, "index_daily", ts_code, "trade_date,close")
-    basics = fetch_by_year(token, "index_dailybasic", ts_code, "trade_date,pe_ttm")
-    pe_by_date = {
-        row["trade_date"]: float(row["pe_ttm"])
+    basics = fetch_by_year(
+        token, "index_dailybasic", ts_code, "trade_date,pe_ttm,total_mv"
+    )
+    basic_by_date = {
+        row["trade_date"]: {
+            "pe": float(row["pe_ttm"]),
+            "totalMv": float(row["total_mv"]),
+        }
         for row in basics
-        if row.get("pe_ttm") and float(row["pe_ttm"]) > 0
+        if row.get("pe_ttm")
+        and float(row["pe_ttm"]) > 0
+        and row.get("total_mv")
+        and float(row["total_mv"]) > 0
     }
     series = []
     for row in prices:
         date = row["trade_date"]
-        pe = pe_by_date.get(date)
-        if not pe:
+        basic = basic_by_date.get(date)
+        if not basic:
             continue
+        pe = basic["pe"]
         close = float(row["close"])
+        profit = basic["totalMv"] / pe / 100000000
         series.append(
             {
                 "date": f"{date[:4]}-{date[4:6]}-{date[6:]}",
                 "close": close,
                 "pe": pe,
-                "earnings": close / pe,
+                "profit": profit,
             }
         )
     return series

@@ -50,7 +50,7 @@ function htmlTemplate(data, echartsSource) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>A股20年：股价、滚动盈利与市盈率</title>
+  <title>A股20年：股价、合计利润与市盈率</title>
   <style>
     :root {
       --bg: #07111f;
@@ -135,7 +135,7 @@ function htmlTemplate(data, echartsSource) {
   <header>
     <div>
       <div class="eyebrow">A-SHARE MARKET DASHBOARD</div>
-      <h1>A股20年：股价、滚动盈利与市盈率</h1>
+      <h1>A股20年：股价、合计利润与市盈率</h1>
       <div class="subtitle">上证综指 × 深证成指，共享同一时间横轴</div>
     </div>
     <div class="asof">数据区间：${START} 至 ${END}<br>周频展示，底层数据为交易日数据</div>
@@ -158,7 +158,7 @@ function htmlTemplate(data, echartsSource) {
     <div id="chart"></div>
   </section>
   <section class="notes">
-    <div class="note"><strong>利润口径：</strong>滚动盈利点数 = 指数点位 ÷ PE(TTM)。它是与指数点位同口径的过去12个月隐含盈利，不是交易所全部公司的利润金额。该口径能消除指数成分、市值规模长期变化带来的不可比问题。</div>
+    <div class="note"><strong>利润口径：</strong>过去12个月合计利润 = 指数总市值 ÷ PE(TTM) ÷ 1亿，单位为亿元。它表示指数覆盖公司的隐含滚动净利润总额，适合观察整体公司利润规模的长期变化。</div>
     <div class="note"><strong>阅读方法：</strong>价格上涨若主要由盈利曲线上升推动，质量更扎实；若价格快速上涨、盈利横盘而PE显著抬升，则主要是估值扩张。虚线标记历史典型顶部窗口，仅用于辅助复盘。</div>
   </section>
 </main>
@@ -171,10 +171,10 @@ const signed = (n) => (n >= 0 ? "+" : "") + fmt(n, 1) + "%";
 const cards = [
   ["上证综指", fmt(DATA.stats.sh.close), "近1年 " + signed(DATA.stats.sh.yearChange), "sh"],
   ["上证PE(TTM)", fmt(DATA.stats.sh.pe), "20年分位 " + fmt(DATA.stats.sh.pePercentile, 0) + "%", "sh"],
-  ["上证滚动盈利", fmt(DATA.stats.sh.earnings), "指数盈利点数", "sh"],
+  ["上证合计利润", fmt(DATA.stats.sh.profit, 0), "亿元", "sh"],
   ["深证成指", fmt(DATA.stats.sz.close), "近1年 " + signed(DATA.stats.sz.yearChange), "sz"],
   ["深证PE(TTM)", fmt(DATA.stats.sz.pe), "20年分位 " + fmt(DATA.stats.sz.pePercentile, 0) + "%", "sz"],
-  ["深证滚动盈利", fmt(DATA.stats.sz.earnings), "指数盈利点数", "sz"],
+  ["深证合计利润", fmt(DATA.stats.sz.profit, 0), "亿元", "sz"],
 ];
 document.getElementById("cards").innerHTML = cards.map(([label, value, meta, cls]) =>
   '<article class="card"><div class="label">' + label + '</div><div class="value ' + cls + '">' + value +
@@ -219,7 +219,7 @@ chart.setOption({
   ],
   title: [
     { text: "指数价格", left: 20, top: 12, textStyle: { color: "#edf4ff", fontSize: 13 } },
-    { text: "过去12个月滚动盈利（指数点）", left: 20, top: "34%", textStyle: { color: "#edf4ff", fontSize: 13 } },
+    { text: "过去12个月合计利润（亿元）", left: 20, top: "34%", textStyle: { color: "#edf4ff", fontSize: 13 } },
     { text: "市盈率 PE(TTM)", left: 20, top: "64%", textStyle: { color: "#edf4ff", fontSize: 13 } }
   ],
   tooltip: {
@@ -227,7 +227,13 @@ chart.setOption({
     backgroundColor: "rgba(7,17,31,.96)", borderColor: "#36506f", textStyle: { color: "#edf4ff" },
     formatter(params) {
       const date = params[0]?.axisValueLabel || "";
-      const lines = params.map(p => p.marker + p.seriesName + "：<b>" + fmt(p.value[1]) + "</b>");
+      const lines = params.map(p => {
+        const isProfit = p.seriesName.includes("合计利润");
+        const isPe = p.seriesName.includes("PE");
+        const value = isProfit ? fmt(p.value[1], 0) : fmt(p.value[1]);
+        const unit = isProfit ? " 亿元" : (isPe ? "x" : "");
+        return p.marker + p.seriesName + "：<b>" + value + unit + "</b>";
+      });
       return "<b>" + date + "</b><br>" + lines.join("<br>");
     }
   },
@@ -239,7 +245,7 @@ chart.setOption({
   ],
   yAxis: [
     { type: "value", gridIndex: 0, scale: true, axisLabel: { color: "#7890aa" }, splitLine: { lineStyle: { color: "#17283d" } } },
-    { type: "value", gridIndex: 1, scale: true, axisLabel: { color: "#7890aa" }, splitLine: { lineStyle: { color: "#17283d" } } },
+    { type: "value", gridIndex: 1, scale: true, axisLabel: { color: "#7890aa", formatter: "{value}亿" }, splitLine: { lineStyle: { color: "#17283d" } } },
     { type: "value", gridIndex: 2, scale: true, axisLabel: { color: "#7890aa", formatter: "{value}x" }, splitLine: { lineStyle: { color: "#17283d" } } }
   ],
   dataZoom: [
@@ -251,8 +257,8 @@ chart.setOption({
   series: [
     series("上证价格", DATA.sh, "close", 0, 0, COLORS.sh, true),
     series("深证价格", DATA.sz, "close", 0, 0, COLORS.sz),
-    series("上证滚动盈利", DATA.sh, "earnings", 1, 1, COLORS.sh),
-    series("深证滚动盈利", DATA.sz, "earnings", 1, 1, COLORS.sz),
+    series("上证合计利润", DATA.sh, "profit", 1, 1, COLORS.sh),
+    series("深证合计利润", DATA.sz, "profit", 1, 1, COLORS.sz),
     series("上证PE(TTM)", DATA.sh, "pe", 2, 2, COLORS.sh),
     series("深证PE(TTM)", DATA.sz, "pe", 2, 2, COLORS.sz)
   ]

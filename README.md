@@ -2,7 +2,7 @@
 
 这个仓库用于生成 A 股大顶研究的本地 HTML 仪表盘，目前包含：
 
-- 总览：上证综指、深证成指的价格、滚动盈利、PE(TTM)
+- 总览：上证综指、深证成指的价格、过去12个月合计利润、PE(TTM)
 - 估值模块：PE(TTM)、PE历史分位、PB可得历史分位、股债收益差
 - 估值事件 List：按年份和季度切换查看典型估值事件
 - 情绪-散户模块：两市成交额、换手率、融资余额、融资余额/流通市值、涨停数量
@@ -35,7 +35,7 @@ http://127.0.0.1:9876
 
 - `outputs/a_share_20y_dashboard.html`：生成后的仪表盘
 - `work/build_market_dashboard.js`：总览生成入口
-- `work/fetch_market_overview_data.py`：总览价格、PE(TTM)、滚动盈利数据更新脚本
+- `work/fetch_market_overview_data.py`：总览价格、PE(TTM)、过去12个月合计利润数据更新脚本
 - `work/market_overview_data.json`：总览数据缓存
 - `work/add_valuation_module.js`：估值模块注入脚本
 - `work/fetch_valuation_data.py`：PB、股债收益差数据更新脚本
@@ -48,7 +48,7 @@ http://127.0.0.1:9876
 ## 数据口径
 
 - PE(TTM)：来自指数动态市盈率历史序列
-- 滚动盈利点数：指数点位 ÷ PE(TTM)
+- 过去12个月合计利润：指数总市值 ÷ PE(TTM)，单位换算为亿元
 - PB：来自 Tushare 指数每日指标
 - 股债收益差：`100 / PE(TTM) - 10年期国债收益率`
 
