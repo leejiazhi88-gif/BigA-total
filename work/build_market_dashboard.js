@@ -102,7 +102,14 @@ function htmlTemplate(data, echartsSource) {
       border-radius: 8px; padding: 7px 12px; cursor: pointer; font-weight: 650;
     }
     button:hover, button.active { color: #07111f; background: var(--accent); border-color: var(--accent); }
-    .legend { display: flex; gap: 17px; color: var(--muted); font-size: 12px; }
+    .legend { display: flex; gap: 10px; color: var(--muted); font-size: 12px; }
+    .market-toggle {
+      display: inline-flex; align-items: center; gap: 7px;
+      height: 32px; padding: 0 10px; border: 1px solid #263b58; border-radius: 8px;
+      background: #132239; cursor: pointer; user-select: none; font-weight: 650;
+    }
+    .market-toggle input { accent-color: var(--accent); margin: 0; }
+    .market-toggle.off { opacity: .45; }
     .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
     #chart {
       height: min(760px, calc(100vh - 255px));
@@ -151,8 +158,8 @@ function htmlTemplate(data, echartsSource) {
         <button class="active" data-years="20">20年</button>
       </div>
       <div class="legend">
-        <span><i class="dot" style="background:var(--sh)"></i>上证综指</span>
-        <span><i class="dot" style="background:var(--sz)"></i>深证成指</span>
+        <label class="market-toggle" data-market="sh"><input type="checkbox" checked data-market="sh"><i class="dot" style="background:var(--sh)"></i>上证</label>
+        <label class="market-toggle" data-market="sz"><input type="checkbox" checked data-market="sz"><i class="dot" style="background:var(--sz)"></i>深证</label>
       </div>
     </div>
     <div id="chart"></div>
@@ -182,6 +189,7 @@ document.getElementById("cards").innerHTML = cards.map(([label, value, meta, cls
 ).join("");
 
 const chart = echarts.init(document.getElementById("chart"), null, { renderer: "canvas" });
+const visibleMarkets = { sh: true, sz: true };
 const topDates = [
   { xAxis: "2007-10-16", name: "2007顶" },
   { xAxis: "2009-08-04", name: "2009顶" },
@@ -203,6 +211,21 @@ function series(name, rows, field, xAxisIndex, yAxisIndex, color, withMarks = fa
       data: topDates
     } : undefined
   };
+}
+function visibleSeries() {
+  const result = [];
+  const marksOnSh = visibleMarkets.sh;
+  if (visibleMarkets.sh) {
+    result.push(series("上证价格", DATA.sh, "close", 0, 0, COLORS.sh, true));
+    result.push(series("上证合计利润", DATA.sh, "profit", 1, 1, COLORS.sh));
+    result.push(series("上证PE(TTM)", DATA.sh, "pe", 2, 2, COLORS.sh));
+  }
+  if (visibleMarkets.sz) {
+    result.push(series("深证价格", DATA.sz, "close", 0, 0, COLORS.sz, !marksOnSh));
+    result.push(series("深证合计利润", DATA.sz, "profit", 1, 1, COLORS.sz));
+    result.push(series("深证PE(TTM)", DATA.sz, "pe", 2, 2, COLORS.sz));
+  }
+  return result;
 }
 const commonAxis = {
   type: "time", axisLine: { lineStyle: { color: "#344760" } },
@@ -254,15 +277,21 @@ chart.setOption({
       backgroundColor: "#0d1929", fillerColor: "rgba(246,200,95,.18)", handleStyle: { color: "#f6c85f" },
       textStyle: { color: "#8fa5bf" }, start: 0, end: 100 }
   ],
-  series: [
-    series("上证价格", DATA.sh, "close", 0, 0, COLORS.sh, true),
-    series("深证价格", DATA.sz, "close", 0, 0, COLORS.sz),
-    series("上证合计利润", DATA.sh, "profit", 1, 1, COLORS.sh),
-    series("深证合计利润", DATA.sz, "profit", 1, 1, COLORS.sz),
-    series("上证PE(TTM)", DATA.sh, "pe", 2, 2, COLORS.sh),
-    series("深证PE(TTM)", DATA.sz, "pe", 2, 2, COLORS.sz)
-  ]
+  series: visibleSeries()
 });
+
+document.querySelectorAll(".market-toggle input").forEach(input => input.addEventListener("change", () => {
+  const market = input.dataset.market;
+  if (!input.checked && Object.values(visibleMarkets).filter(Boolean).length === 1) {
+    input.checked = true;
+    return;
+  }
+  visibleMarkets[market] = input.checked;
+  document.querySelectorAll(".market-toggle").forEach(label => {
+    label.classList.toggle("off", !visibleMarkets[label.dataset.market]);
+  });
+  chart.setOption({ series: visibleSeries() }, { replaceMerge: ["series"] });
+}));
 
 document.querySelectorAll(".ranges [data-years]").forEach(btn => btn.addEventListener("click", () => {
   document.querySelectorAll(".ranges [data-years]").forEach(b => b.classList.remove("active"));
