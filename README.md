@@ -11,6 +11,7 @@
 - 情绪-官方模块：IPO融资、产业资本净减持、印花税率、政策利率、社融/M2与政策事件
 
 换机同步、线上地址、部署与本地运行说明见 [HANDOFF.md](HANDOFF.md)。
+国家队 ETF 暴露聚类的候选基金池、统计公式与数据限制见 [NATIONAL_TEAM_ETF_CLUSTER.md](NATIONAL_TEAM_ETF_CLUSTER.md)。
 
 ## 运行
 
@@ -47,6 +48,7 @@ http://127.0.0.1:9876
 - `work/add_large_money_sentiment_module.js`：大资金模块注入脚本
 - `work/fetch_official_sentiment_data.py`：官方情绪连续数据更新脚本
 - `work/add_official_sentiment_module.js`：官方情绪模块注入脚本
+- `NATIONAL_TEAM_ETF_CLUSTER.md`：国家队 ETF 底层暴露聚类方案与口径
 
 ## 数据口径
 
