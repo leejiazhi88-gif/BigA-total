@@ -242,9 +242,24 @@
       gap: 15px; align-items: stretch;
     }
     #officialSentimentChart { height: 500px; width: 100%; }
+    .official-methodology {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px; margin-top: 10px;
+    }
+    .official-method {
+      border: 1px solid var(--line); border-radius: 8px;
+      background: rgba(8, 18, 32, .62); padding: 11px 12px;
+    }
+    .official-method strong {
+      display: block; color: var(--text); font-size: 13px; margin-bottom: 5px;
+    }
+    .official-method span {
+      display: block; color: var(--muted); font-size: 12px; line-height: 1.62;
+    }
     @media (max-width: 980px) {
       .official-grid { grid-template-columns: 1fr; }
       #officialSentimentChart { height: 450px; }
+      .official-methodology { grid-template-columns: 1fr; }
     }
   </style>
 
@@ -568,8 +583,18 @@
     </div>
 
     <div class="valuation-foot">
-      <div class="note"><strong>连续数据口径：</strong>IPO融资额来自新股募集资金；产业资本净减持额仅统计公告中带均价的增减持记录，正值为净减持；政策利率用1年期SHIBOR代理；社融与M2为月度数据。</div>
-      <div class="note"><strong>待补口径：</strong>再融资额、国家队持仓规模需要更明确的数据源与机构名单，当前保留为指标占位，不绘制不可靠曲线。</div>
+      <div class="note"><strong>连续数据口径总览：</strong>周频指标按自然周汇总并落在该周最后一个可用日期；月度宏观指标落在月末；印花税率按政策生效日做阶梯序列，不做线性插值。</div>
+      <div class="note"><strong>国家队持仓规模为什么暂缺：</strong>没有官方统一的连续披露口径。若把中央汇金、证金、社保、外汇局、险资、公募ETF申购或稳定市场工具混在一起，结果会高度依赖人工机构名单和持仓范围，容易画出看似精确但不可复核的曲线，所以当前只保留事件记录，不绘制连续指标。</div>
+      <div class="official-methodology" aria-label="官方情绪指标统计口径">
+        <div class="official-method"><strong>IPO融资额</strong><span>来源为 Tushare new_share 的 funds 字段，按 IPO 日期或发行日期归入自然周求和，单位亿元；用于观察一级市场供给节奏。</span></div>
+        <div class="official-method"><strong>再融资额</strong><span>暂未接入。定增、配股、可转债、优先股等口径需要统一发行日、募资额和失败/撤回处理规则，当前不画不完整曲线。</span></div>
+        <div class="official-method"><strong>产业资本净减持额</strong><span>来源为 Tushare stk_holdertrade；仅统计公告中有均价的增减持记录，金额=变动股数×均价，减持记正、增持记负，按周汇总，单位亿元。</span></div>
+        <div class="official-method"><strong>印花税率</strong><span>手工维护证券交易印花税政策生效日与税率，单位%；图上按阶梯线展示，表示税率在下一次政策调整前保持不变。</span></div>
+        <div class="official-method"><strong>政策利率</strong><span>用 1年期 SHIBOR 作为资金利率环境代理，取每周最后一个可用值，单位%；它不是央行政策利率本身，但可观察银行间资金价格趋势。</span></div>
+        <div class="official-method"><strong>社融增量</strong><span>来源为 Tushare sf_month 的 inc_month，月度社会融资规模增量，落在月末，单位亿元；用于观察信用扩张或收缩。</span></div>
+        <div class="official-method"><strong>M2增速</strong><span>来源为 Tushare cn_m 的 m2_yoy，月度 M2 同比增速，落在月末，单位%；需结合社融和利率判断流动性状态。</span></div>
+        <div class="official-method"><strong>国家队持仓规模</strong><span>暂未接入连续序列。后续若要做，需要先固定机构名单、证券范围、估值时点和是否纳入 ETF/申购工具，再从季报或公告逐期聚合。</span></div>
+      </div>
     </div>
   </section>
 
