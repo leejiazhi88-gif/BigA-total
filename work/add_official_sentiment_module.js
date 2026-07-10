@@ -195,6 +195,7 @@ const script = `
         ],
         series: [{
           name: cfg.title, type: "line", data: points, showSymbol: false,
+          step: activeMetric === "stampTaxRate" ? "end" : false,
           sampling: "lttb", lineStyle: { width: 2.2, color: "#ff5d73" },
           areaStyle: { color: "rgba(255,93,115,.08)" }, itemStyle: { color: "#ff5d73" }
         }]

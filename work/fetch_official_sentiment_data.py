@@ -70,6 +70,7 @@ def stamp_tax_points():
         {"date": "2008-04-24", "stampTaxRate": 0.10},
         {"date": "2008-09-19", "stampTaxRate": 0.10},
         {"date": "2023-08-28", "stampTaxRate": 0.05},
+        {"date": iso_date(END_DATE), "stampTaxRate": 0.05},
     ]
 
 
