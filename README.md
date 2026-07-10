@@ -8,6 +8,7 @@
 - 情绪-散户模块：两市成交额、换手率、融资余额、融资余额/流通市值、涨停数量
 - 散户情绪事件 List：按年份和季度切换查看开户、基金、融资监管与极端情绪事件
 - 情绪-大资金模块：大宗交易、机构席位大宗净买入、产业资本增减持、北向资金历史口径
+- 情绪-官方模块：IPO融资、产业资本净减持、印花税率、政策利率、社融/M2与政策事件
 
 换机同步、线上地址、部署与本地运行说明见 [HANDOFF.md](HANDOFF.md)。
 
@@ -44,6 +45,8 @@ http://127.0.0.1:9876
 - `work/add_retail_sentiment_module.js`：散户情绪模块注入脚本
 - `work/fetch_large_money_sentiment_data.py`：大资金连续数据更新脚本
 - `work/add_large_money_sentiment_module.js`：大资金模块注入脚本
+- `work/fetch_official_sentiment_data.py`：官方情绪连续数据更新脚本
+- `work/add_official_sentiment_module.js`：官方情绪模块注入脚本
 
 ## 数据口径
 
