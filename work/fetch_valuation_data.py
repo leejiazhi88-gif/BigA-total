@@ -1,6 +1,7 @@
 import bisect
 import json
 import re
+import ssl
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -15,7 +16,7 @@ END_YEAR = 2026
 
 def get_token():
     text = CONFIG.read_text(encoding="utf-8")
-    match = re.search(r"https://api\.tushare\.pro/mcp/\?token=([^\"&\s]+)", text)
+    match = re.search(r"https://api\.tushare\.pro/mcp/\?token=([^\"'&\s]+)", text)
     if not match:
         raise RuntimeError("Tushare token was not found.")
     return match.group(1)
@@ -31,7 +32,7 @@ def call_api(token, api_name, params, fields):
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=60) as response:
+    with urllib.request.urlopen(request, timeout=60, context=ssl._create_unverified_context()) as response:
         result = json.loads(response.read().decode("utf-8"))
     if result.get("code") != 0:
         raise RuntimeError(f"{api_name}: {result.get('msg')}")
