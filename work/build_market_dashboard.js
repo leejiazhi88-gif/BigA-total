@@ -5,7 +5,7 @@ const ROOT = path.resolve(__dirname, "..");
 const OUTPUT = path.join(ROOT, "outputs", "a_share_20y_dashboard.html");
 const ROOT_INDEX = path.join(ROOT, "index.html");
 const START = "2006-06-05";
-const END = "2026-07-02";
+const END = "2026-07-14";
 
 function readMarketOverview() {
   return JSON.parse(fs.readFileSync(path.join(ROOT, "work", "market_overview_data.json"), "utf8"));
@@ -327,6 +327,12 @@ async function main() {
       stdio: "inherit",
     });
     execFileSync(python, [path.join(ROOT, "work", "fetch_official_sentiment_data.py")], {
+      stdio: "inherit",
+    });
+    execFileSync(python, [path.join(ROOT, "work", "fetch_retail_sentiment_data.py")], {
+      stdio: "inherit",
+    });
+    execFileSync(python, [path.join(ROOT, "work", "fetch_large_money_sentiment_data.py")], {
       stdio: "inherit",
     });
     execFileSync(python, [path.join(ROOT, "work", "fetch_national_team_etf_data.py")], {
