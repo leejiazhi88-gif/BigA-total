@@ -732,6 +732,7 @@ document.getElementById("cards").innerHTML = cards.map(([label, value, meta, cls
 
 const chart = echarts.init(document.getElementById("chart"), null, { renderer: "canvas" });
 const visibleMarkets = { sh: true, sz: true };
+let activeYears = 20;
 const topDates = [
   { xAxis: "2007-10-16", name: "2007顶" },
   { xAxis: "2009-08-04", name: "2009顶" },
@@ -768,6 +769,41 @@ function visibleSeries() {
     result.push(series("深证PE(TTM)", DATA.sz, "pe", 2, 2, COLORS.sz));
   }
   return result;
+}
+function rowsInActiveRange(rows) {
+  if (!activeYears) return rows;
+  const end = new Date("2026-07-14T00:00:00Z");
+  const start = new Date(end);
+  start.setUTCFullYear(start.getUTCFullYear() - activeYears);
+  return rows.filter(row => row.date >= start.toISOString().slice(0, 10) && row.date <= "2026-07-14");
+}
+function visibleValues(field) {
+  const values = [];
+  if (visibleMarkets.sh) values.push(...rowsInActiveRange(DATA.sh).map(row => row[field]));
+  if (visibleMarkets.sz) values.push(...rowsInActiveRange(DATA.sz).map(row => row[field]));
+  return values.filter(Number.isFinite);
+}
+function axisBounds(field, paddingRatio = 0.08) {
+  const values = visibleValues(field);
+  if (!values.length) return {};
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, Math.abs(max) * 0.02, 1);
+  const padding = span * paddingRatio;
+  return { min: Math.max(0, min - padding), max: max + padding };
+}
+function overviewYAxis() {
+  const price = axisBounds("close", 0.10);
+  const profit = axisBounds("profit", 0.10);
+  const pe = axisBounds("pe", 0.10);
+  return [
+    { type: "value", gridIndex: 0, scale: true, ...price, axisLabel: { color: "#7890aa" }, splitLine: { lineStyle: { color: "#17283d" } } },
+    { type: "value", gridIndex: 1, scale: true, ...profit, axisLabel: { color: "#7890aa", formatter: "{value}亿" }, splitLine: { lineStyle: { color: "#17283d" } } },
+    { type: "value", gridIndex: 2, scale: true, ...pe, axisLabel: { color: "#7890aa", formatter: "{value}x" }, splitLine: { lineStyle: { color: "#17283d" } } }
+  ];
+}
+function renderOverview() {
+  chart.setOption({ series: visibleSeries(), yAxis: overviewYAxis() }, { replaceMerge: ["series", "yAxis"] });
 }
 const commonAxis = {
   type: "time", axisLine: { lineStyle: { color: "#344760" } },
@@ -809,9 +845,7 @@ chart.setOption({
     { ...commonAxis, gridIndex: 2 }
   ],
   yAxis: [
-    { type: "value", gridIndex: 0, scale: true, axisLabel: { color: "#7890aa" }, splitLine: { lineStyle: { color: "#17283d" } } },
-    { type: "value", gridIndex: 1, scale: true, axisLabel: { color: "#7890aa", formatter: "{value}亿" }, splitLine: { lineStyle: { color: "#17283d" } } },
-    { type: "value", gridIndex: 2, scale: true, axisLabel: { color: "#7890aa", formatter: "{value}x" }, splitLine: { lineStyle: { color: "#17283d" } } }
+    ...overviewYAxis()
   ],
   dataZoom: [
     { type: "inside", xAxisIndex: [0,1,2], filterMode: "none", start: 0, end: 100 },
@@ -832,17 +866,19 @@ document.querySelectorAll(".market-toggle input").forEach(input => input.addEven
   document.querySelectorAll(".market-toggle").forEach(label => {
     label.classList.toggle("off", !visibleMarkets[label.dataset.market]);
   });
-  chart.setOption({ series: visibleSeries() }, { replaceMerge: ["series"] });
+  renderOverview();
 }));
 
 document.querySelectorAll(".ranges [data-years]").forEach(btn => btn.addEventListener("click", () => {
   document.querySelectorAll(".ranges [data-years]").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   const years = Number(btn.dataset.years);
+  activeYears = years;
   const end = new Date("2026-07-14T00:00:00Z");
   const start = new Date(end);
   start.setUTCFullYear(start.getUTCFullYear() - years);
   chart.dispatchAction({ type: "dataZoom", startValue: start.toISOString().slice(0,10), endValue: "2026-07-14" });
+  renderOverview();
 }));
 window.addEventListener("resize", () => chart.resize());
 </script>
