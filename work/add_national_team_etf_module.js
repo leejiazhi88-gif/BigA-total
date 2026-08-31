@@ -20,6 +20,7 @@ const css = `
       gap: 15px; align-items: stretch;
     }
     #nationalTeamEtfChart { height: 520px; width: 100%; }
+    #nationalTeamEtfTrendChart { height: 320px; width: 100%; }
     .nt-etf-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .nt-etf-stat {
       border: 1px solid var(--line); border-radius: 8px; padding: 12px;
@@ -55,6 +56,13 @@ const moduleHtml = `
     <div class="nt-etf-grid">
       <article class="valuation-panel">
         <div class="panel-head">
+          <div>
+            <div class="panel-title">国家队暴露时间线</div>
+            <div class="panel-subtitle">按关键压力节点观察国家队底层暴露变化，重点看是否存在托底抬升</div>
+          </div>
+        </div>
+        <div id="nationalTeamEtfTrendChart"></div>
+        <div class="panel-head" style="margin-top:12px;">
           <div>
             <div class="panel-title">聚类散点图</div>
             <div class="panel-subtitle">横轴为披露持仓数量，纵轴为国家队底层暴露比例；颜色为持仓相似度聚类</div>
@@ -121,6 +129,78 @@ const script = `
       }).join("") + '</tbody></table>';
 
     const chart = echarts.init(document.getElementById("nationalTeamEtfChart"), null, { renderer: "canvas" });
+    const trendChart = echarts.init(document.getElementById("nationalTeamEtfTrendChart"), null, { renderer: "canvas" });
+    const historySeries = ntEtfData.history || [];
+    const trendNames = {
+      "510050.SH": "上证50ETF",
+      "510300.SH": "沪深300ETF",
+    };
+    const crisisMarks = (ntEtfData.meta.crisisMarks || [
+      {"date":"2015-06-30","name":"2015股灾"},
+      {"date":"2018-09-30","name":"2018调整"},
+      {"date":"2020-03-31","name":"2020冲击"},
+      {"date":"2024-02-29","name":"2024低点"}
+    ]).map(row => ({ xAxis: row.date, name: row.name }));
+    const trendSeries = Object.keys(trendNames).map(code => ({
+      name: trendNames[code],
+      type: "line",
+      data: historySeries.map(row => [row.date, row[code] || 0]),
+      showSymbol: false,
+      smooth: false,
+      lineStyle: { width: 1.8 },
+      symbolSize: 6
+    }));
+    trendSeries.push({
+      name: "平均暴露",
+      type: "line",
+      data: historySeries.map(row => [row.date, row.averageExposure]),
+      showSymbol: true,
+      symbolSize: 7,
+      lineStyle: { width: 3, color: "#f6c85f" },
+      itemStyle: { color: "#f6c85f" },
+        markPoint: {
+          symbolSize: 56,
+          label: { color: "#edf4ff" },
+          data: crisisMarks.map(item => ({
+            name: item.name,
+            coord: [item.xAxis, historySeries.find(row => row.date === item.xAxis)?.averageExposure || 0]
+          }))
+        },
+      markLine: {
+        symbol: ["none", "none"],
+        silent: true,
+        lineStyle: { color: "#53657d", type: "dashed", width: 1 },
+        label: { color: "#8fa5bf", fontSize: 10, formatter: p => p.name },
+        data: crisisMarks
+      }
+    });
+    trendChart.setOption({
+      animation: false,
+      grid: { left: 58, right: 22, top: 36, bottom: 44 },
+      tooltip: {
+        trigger: "axis",
+        backgroundColor: "rgba(7,17,31,.96)",
+        borderColor: "#36506f",
+        textStyle: { color: "#edf4ff" },
+        valueFormatter: value => fmt(value, 2) + "%"
+      },
+      xAxis: {
+        type: "category",
+        boundaryGap: false,
+        axisLine: { lineStyle: { color: "#344760" } },
+        axisLabel: { color: "#7890aa" },
+        data: historySeries.map(row => row.date)
+      },
+      yAxis: {
+        type: "value",
+        scale: true,
+        axisLabel: { color: "#7890aa", formatter: "{value}%" },
+        splitLine: { lineStyle: { color: "#17283d" } }
+      },
+      series: [{
+        ...trendSeries
+      }]
+    }, true);
     const series = ntEtfData.clusters.map(cluster => {
       const rows = ntEtfData.etfs.filter(row => row.cluster === cluster.cluster);
       return {
@@ -172,6 +252,7 @@ const script = `
       series
     }, true);
     window.addEventListener("resize", () => chart.resize());
+    window.addEventListener("resize", () => trendChart.resize());
   })();
   </script>
 `;

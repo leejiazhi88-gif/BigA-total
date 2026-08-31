@@ -3,6 +3,7 @@ import math
 import re
 import ssl
 import urllib.request
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -11,6 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG = Path.home() / ".codex" / "config.toml"
 OUTPUT = ROOT / "work" / "national_team_etf_data.json"
 PERIOD = "20260331"
+HISTORY_PERIODS = [
+    "20150630",
+    "20150831",
+    "20181031",
+    "20200229",
+    "20200331",
+    "20240630",
+    "20250331",
+    "20260331",
+]
 
 ETF_POOL = [
     {"ts_code": "510050.SH", "name": "华夏上证50ETF", "group": "宽基大盘"},
@@ -25,6 +36,23 @@ ETF_POOL = [
     {"ts_code": "512760.SH", "name": "国泰中证全指半导体ETF", "group": "科技制造"},
     {"ts_code": "159995.SZ", "name": "华夏国证半导体芯片ETF", "group": "科技制造"},
     {"ts_code": "515790.SH", "name": "华泰柏瑞中证光伏产业ETF", "group": "科技制造"},
+]
+
+HISTORY_ETFS = ["510050.SH", "510300.SH"]
+
+HISTORY_PROXY_SYMBOLS = [
+    "600519.SH",
+    "601318.SH",
+    "600036.SH",
+    "601398.SH",
+    "601288.SH",
+]
+
+CRISIS_MARKS = [
+    {"date": "2015-06-30", "name": "2015股灾"},
+    {"date": "2018-09-30", "name": "2018调整"},
+    {"date": "2020-03-31", "name": "2020冲击"},
+    {"date": "2024-02-29", "name": "2024低点"},
 ]
 
 NATIONAL_TEAM_PATTERNS = [
@@ -91,6 +119,42 @@ def normalized_holdings(rows):
         else:
             row["weight"] = 0
     return usable
+
+
+def build_history_period_rows(token, period, etf_codes):
+    snapshots = {}
+    for code in etf_codes:
+        time.sleep(0.05)
+        rows = call_api(
+            token,
+            "fund_portfolio",
+            {"ts_code": code, "period": period},
+            "ts_code,ann_date,end_date,symbol,mkv,amount,stk_mkv_ratio,stk_float_ratio",
+        )
+        snapshots[code] = normalized_holdings(rows)
+
+    holder_exposure = {}
+    for symbol in HISTORY_PROXY_SYMBOLS:
+        time.sleep(0.05)
+        holders = call_api(
+            token,
+            "top10_floatholders",
+            {"ts_code": symbol, "period": period},
+            "ts_code,ann_date,end_date,holder_name,hold_amount,hold_ratio,hold_float_ratio,holder_type",
+        )
+        matched = [row for row in holders if is_national_team(row.get("holder_name"))]
+        holder_exposure[symbol] = sum(float(row.get("hold_float_ratio") or 0) for row in matched) / 100
+
+    point = {"date": f"{period[:4]}-{period[4:6]}-{period[6:]}"}
+    exposures = []
+    for code in etf_codes:
+        holdings = snapshots.get(code, [])
+        exposure = sum(row["weight"] * holder_exposure.get(row["symbol"], 0) for row in holdings)
+        point[code] = round(exposure * 100, 4)
+        exposures.append(exposure * 100)
+    point["averageExposure"] = round(sum(exposures) / len(exposures), 4) if exposures else 0.0
+    point["activeCount"] = len(exposures)
+    return point
 
 
 def cosine(a, b):
@@ -166,6 +230,8 @@ def main():
         symbols.update(row["symbol"] for row in holdings)
         etfs.append({**etf, "holdings": holdings, "rawRows": len(rows)})
 
+    history = [build_history_period_rows(token, period, HISTORY_ETFS) for period in HISTORY_PERIODS]
+
     holder_exposure = {}
     holder_details = {}
     for symbol in sorted(symbols):
@@ -240,6 +306,8 @@ def main():
         "meta": {
             "updated": datetime.now().strftime("%Y-%m-%d"),
             "period": PERIOD,
+            "historyPeriods": HISTORY_PERIODS,
+            "crisisMarks": CRISIS_MARKS,
             "source": "Tushare fund_portfolio + top10_floatholders",
             "method": "ETF disclosed stock holdings weighted by national-team float-holder ratios",
             "directEtfHolding": False,
@@ -249,6 +317,7 @@ def main():
                 "ratio is bottom-up stock exposure, not direct ETF unit ownership",
             ],
         },
+        "history": history,
         "etfs": sorted(etfs, key=lambda row: row["nationalTeamExposure"], reverse=True),
         "clusters": clusters,
     }
