@@ -19,8 +19,9 @@ const css = `
       display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(380px, .95fr);
       gap: 15px; align-items: stretch;
     }
-    #nationalTeamEtfChart { height: 520px; width: 100%; }
-    #nationalTeamEtfTrendChart { height: 320px; width: 100%; }
+    #nationalTeamEtfChart { height: 520px; width: 100%; min-height: 520px; }
+    #nationalTeamEtfTrendChart { height: 320px; width: 100%; min-height: 320px; }
+    #national-team-etf .valuation-panel { outline: 1px solid rgba(246,200,95,.08); }
     .nt-etf-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .nt-etf-stat {
       border: 1px solid var(--line); border-radius: 8px; padding: 12px;
