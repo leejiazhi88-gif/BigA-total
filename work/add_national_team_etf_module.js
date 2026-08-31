@@ -139,16 +139,16 @@ const script = `
       {"date":"2015-06-30","name":"2015股灾"},
       {"date":"2018-09-30","name":"2018调整"},
       {"date":"2020-03-31","name":"2020冲击"},
-      {"date":"2024-02-29","name":"2024低点"}
+      {"date":"2024-03-31","name":"2024低点"}
     ]).map(row => ({ xAxis: row.date, name: row.name }));
     const trendSeries = Object.keys(trendNames).map(code => ({
       name: trendNames[code],
       type: "line",
       data: historySeries.map(row => [row.date, row[code] || 0]),
-      showSymbol: false,
+      showSymbol: true,
       smooth: false,
       lineStyle: { width: 1.8 },
-      symbolSize: 6
+      symbolSize: 7
     }));
     trendSeries.push({
       name: "平均暴露",
@@ -176,7 +176,12 @@ const script = `
     });
     trendChart.setOption({
       animation: false,
-      grid: { left: 58, right: 22, top: 36, bottom: 44 },
+      color: ["#36c2ff", "#ff5d73", "#f6c85f"],
+      grid: { left: 58, right: 22, top: 58, bottom: 44 },
+      legend: {
+        top: 10,
+        textStyle: { color: "#8fa5bf" }
+      },
       tooltip: {
         trigger: "axis",
         backgroundColor: "rgba(7,17,31,.96)",
@@ -185,21 +190,19 @@ const script = `
         valueFormatter: value => fmt(value, 2) + "%"
       },
       xAxis: {
-        type: "category",
+        type: "time",
         boundaryGap: false,
         axisLine: { lineStyle: { color: "#344760" } },
-        axisLabel: { color: "#7890aa" },
-        data: historySeries.map(row => row.date)
+        axisLabel: { color: "#7890aa", hideOverlap: true }
       },
       yAxis: {
         type: "value",
-        scale: true,
+        min: 0,
+        max(value) { return Math.max(6, Math.ceil(value.max + 1)); },
         axisLabel: { color: "#7890aa", formatter: "{value}%" },
         splitLine: { lineStyle: { color: "#17283d" } }
       },
-      series: [{
-        ...trendSeries
-      }]
+      series: trendSeries
     }, true);
     const series = ntEtfData.clusters.map(cluster => {
       const rows = ntEtfData.etfs.filter(row => row.cluster === cluster.cluster);
