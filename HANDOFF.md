@@ -118,7 +118,7 @@ python3 -m unittest discover -s work -p 'test_*.py'
 
 发布时需提交源脚本、数据 JSON、`index.html` 和 `outputs/a_share_20y_dashboard.html`。推送后检查 GitHub Pages 实际页面，确认曲线和日期已更新；只推送源代码不会在 Pages 自动运行 Python 拉数据。
 
-本地 HTTP 与直接打开 HTML 使用同一份内嵌数据。总览市盈率下方的“交易规模”固定显示沪深 A 股合计，成交量用亿股、成交额用亿元，跟随总览时间范围缩放。
+本地 HTTP 与直接打开 HTML 使用同一份内嵌数据。总览从上到下依次为指数价格、交易规模、市盈率、过去12个月合计利润。“交易规模”固定显示沪深 A 股合计，成交量用亿股、成交额用亿元，跟随总览时间范围缩放。
 
 ### 2026-09-28 刷新记录
 

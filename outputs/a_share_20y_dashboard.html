@@ -835,17 +835,17 @@ chart.setOption({
   backgroundColor: "transparent",
   grid: [
     { left: 72, right: 68, top: 42, height: "22%" },
-    { left: 72, right: 68, top: "31%", height: "17%" },
+    { left: 72, right: 68, top: "76%", height: "17%" },
     { left: 72, right: 68, top: "55%", height: "15%" },
-    { left: 72, right: 68, top: "78%", height: "15%" }
+    { left: 72, right: 68, top: "33%", height: "15%" }
   ],
   title: [
     { text: "指数价格", left: 20, top: 12, textStyle: { color: "#edf4ff", fontSize: 13 } },
-    { text: "过去12个月合计利润（亿元）", left: 20, top: "28%", textStyle: { color: "#edf4ff", fontSize: 13 } },
+    { text: "交易规模 · 沪深A股合计", left: 20, top: "28%", textStyle: { color: "#edf4ff", fontSize: 13 } },
     { text: "市盈率 PE(TTM)", left: 20, top: "52%", textStyle: { color: "#edf4ff", fontSize: 13 } },
-    { text: "交易规模 · 沪深A股合计", left: 20, top: "73%", textStyle: { color: "#edf4ff", fontSize: 13 } }
+    { text: "过去12个月合计利润（亿元）", left: 20, top: "73%", textStyle: { color: "#edf4ff", fontSize: 13 } }
   ],
-  legend: { data: ["交易量", "交易额"], top: "75%", left: "center", textStyle: { color: "#edf4ff" } },
+  legend: { data: ["交易量", "交易额"], top: "30%", left: "center", textStyle: { color: "#edf4ff" } },
   tooltip: {
     trigger: "axis", axisPointer: { type: "cross", link: [{ xAxisIndex: "all" }] },
     backgroundColor: "rgba(7,17,31,.96)", borderColor: "#36506f", textStyle: { color: "#edf4ff" },
@@ -864,9 +864,9 @@ chart.setOption({
   axisPointer: { link: [{ xAxisIndex: "all" }], label: { backgroundColor: "#263b58" } },
   xAxis: [
     { ...commonAxis, gridIndex: 0, axisLabel: { show: false } },
-    { ...commonAxis, gridIndex: 1, axisLabel: { show: false } },
+    { ...commonAxis, gridIndex: 1 },
     { ...commonAxis, gridIndex: 2, axisLabel: { show: false } },
-    { ...commonAxis, gridIndex: 3 }
+    { ...commonAxis, gridIndex: 3, axisLabel: { show: false } }
   ],
   yAxis: [
     ...overviewYAxis()
