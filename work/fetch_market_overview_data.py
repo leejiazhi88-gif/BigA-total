@@ -1,41 +1,13 @@
 import json
-import re
-import ssl
-import urllib.request
 from pathlib import Path
+
+from tushare_client import END_DATE, call_api, get_token
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = Path.home() / ".codex" / "config.toml"
 OUTPUT = ROOT / "work" / "market_overview_data.json"
 START_YEAR = 2006
-END_DATE = "20260828"
 
-
-def get_token():
-    text = CONFIG.read_text(encoding="utf-8")
-    match = re.search(r"https://api\.tushare\.pro/mcp/\?token=([^\"'&\s]+)", text)
-    if not match:
-        raise RuntimeError("Tushare token was not found.")
-    return match.group(1)
-
-
-def call_api(token, api_name, params, fields):
-    payload = json.dumps(
-        {"api_name": api_name, "token": token, "params": params, "fields": fields}
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        "https://api.tushare.pro",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=90, context=ssl._create_unverified_context()) as response:
-        result = json.loads(response.read().decode("utf-8"))
-    if result.get("code") != 0:
-        raise RuntimeError(f"{api_name}: {result.get('msg')}")
-    data = result.get("data") or {}
-    return [dict(zip(data.get("fields", []), row)) for row in data.get("items", [])]
 
 
 def fetch_by_year(token, api_name, ts_code, fields):
@@ -95,13 +67,41 @@ def build_market(token, ts_code):
     return series
 
 
+def build_trading(token):
+    markets = []
+    for code in ("000002.SH", "399107.SZ"):
+        rows = fetch_by_year(token, "index_daily", code, "trade_date,vol,amount")
+        markets.append({row["trade_date"]: row for row in rows})
+    series = []
+    for date in sorted(set(markets[0]) & set(markets[1])):
+        rows = [market[date] for market in markets]
+        if any(row.get(field) is None for row in rows for field in ("vol", "amount")):
+            continue
+        series.append({
+            "date": f"{date[:4]}-{date[4:6]}-{date[6:]}",
+            "volume": round(sum(float(row["vol"]) for row in rows) / 1e6, 4),
+            "amount": round(sum(float(row["amount"]) for row in rows) / 1e5, 4),
+        })
+    if not series:
+        raise RuntimeError("No complete Shanghai/Shenzhen A-share trading data returned.")
+    return series
+
+
 def main():
     token = get_token()
     result = {
-        "meta": {"end": f"{END_DATE[:4]}-{END_DATE[4:6]}-{END_DATE[6:]}"},
+        "meta": {"requestedEnd": END_DATE},
         "sh": build_market(token, "000001.SH"),
         "sz": build_market(token, "399001.SZ"),
+        "trading": build_trading(token),
     }
+    result["meta"].update({
+        "end": min(result[market][-1]["date"] for market in ("sh", "sz", "trading")),
+        "tradingSource": "Tushare index_daily: 000002.SH + 399107.SZ",
+        "tradingScope": "Shanghai and Shenzhen A shares; excludes B shares, Beijing, funds and bonds",
+        "volumeUnit": "亿股", "amountUnit": "亿元",
+        "conversion": "vol (hands of 100 shares) / 1e6; amount (thousand CNY) / 1e5",
+    })
     OUTPUT.write_text(
         json.dumps(result, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",

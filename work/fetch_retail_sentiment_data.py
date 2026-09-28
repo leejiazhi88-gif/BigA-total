@@ -1,44 +1,16 @@
 import json
-import re
-import ssl
-import urllib.request
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+
+from tushare_client import END_DATE, call_api, get_token
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = Path.home() / ".codex" / "config.toml"
 OUTPUT = ROOT / "work" / "retail_sentiment_data.json"
 START_YEAR = 2016
-END_YEAR = 2026
-END_DATE = "20260828"
+END_YEAR = int(END_DATE[:4])
 
-
-def get_token():
-    text = CONFIG.read_text(encoding="utf-8")
-    match = re.search(r"https://api\.tushare\.pro/mcp/\?token=([^\"'&\s]+)", text)
-    if not match:
-        raise RuntimeError("Tushare token was not found.")
-    return match.group(1)
-
-
-def call_api(token, api_name, params, fields):
-    payload = json.dumps(
-        {"api_name": api_name, "token": token, "params": params, "fields": fields}
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        "https://api.tushare.pro",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=90, context=ssl._create_unverified_context()) as response:
-        result = json.loads(response.read().decode("utf-8"))
-    if result.get("code") != 0:
-        raise RuntimeError(f"{api_name}: {result.get('msg')}")
-    data = result.get("data") or {}
-    return [dict(zip(data.get("fields", []), row)) for row in data.get("items", [])]
 
 
 def yearly(token, api_name, base_params, fields, start_year=START_YEAR):
@@ -69,7 +41,7 @@ def monthly_limit_counts(token):
             start = f"{year}{month:02d}01"
             next_year = year + (month == 12)
             next_month = 1 if month == 12 else month + 1
-            end = min(datetime(next_year, next_month, 1).strftime("%Y%m%d"), END_DATE)
+            end = min((datetime(next_year, next_month, 1) - timedelta(days=1)).strftime("%Y%m%d"), END_DATE)
             rows = call_api(
                 token,
                 "limit_list_d",

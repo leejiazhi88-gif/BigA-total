@@ -5,7 +5,7 @@ const ROOT = path.resolve(__dirname, "..");
 const OUTPUT = path.join(ROOT, "outputs", "a_share_20y_dashboard.html");
 const ROOT_INDEX = path.join(ROOT, "index.html");
 const START = "2006-06-05";
-const END = "2026-08-28";
+let END;
 
 function readMarketOverview() {
   return JSON.parse(fs.readFileSync(path.join(ROOT, "work", "market_overview_data.json"), "utf8"));
@@ -16,9 +16,8 @@ function lastByWeek(rows) {
   let key = "";
   for (const row of rows) {
     const date = new Date(`${row.date}T00:00:00Z`);
-    const first = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-    const week = Math.floor((date - first) / 604800000);
-    const nextKey = `${date.getUTCFullYear()}-${week}`;
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const nextKey = date.toISOString().slice(0, 10);
     if (nextKey !== key) {
       result.push(row);
       key = nextKey;
@@ -112,8 +111,8 @@ function htmlTemplate(data, echartsSource) {
     .market-toggle.off { opacity: .45; }
     .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
     #chart {
-      height: min(760px, calc(100vh - 255px));
-      min-height: 570px;
+      height: 1080px;
+      min-height: 1080px;
       background: rgba(9,20,34,.94);
       border: 1px solid var(--line); border-top: 0; border-radius: 0 0 14px 14px;
     }
@@ -127,7 +126,7 @@ function htmlTemplate(data, echartsSource) {
       .cards { grid-template-columns: repeat(3, 1fr); }
       header { align-items: flex-start; flex-direction: column; }
       .asof { text-align: left; }
-      #chart { height: 680px; }
+      #chart { height: 1080px; }
     }
     @media (max-width: 620px) {
       .wrap { padding: 20px 12px 26px; }
@@ -163,6 +162,7 @@ function htmlTemplate(data, echartsSource) {
       </div>
     </div>
     <div id="chart"></div>
+    <div class="note" id="trading-scale"><strong>交易规模口径：</strong>沪深A股合计（上证A指 000002.SH + 深证A指 399107.SZ），不含B股、北交所、基金和债券。成交量按手×100÷1亿换算为亿股；成交额按千元×1000÷1亿换算为亿元。每周展示最后交易日的单日值，不是整周累计。两条曲线采用独立纵轴，上方市场勾选不改变两市合计口径。最新 ${data.trading.at(-1).date}：成交量 ${data.trading.at(-1).volume.toFixed(2)} 亿股，成交额 ${data.trading.at(-1).amount.toFixed(2)} 亿元。</div>
   </section>
   <section class="notes">
     <div class="note"><strong>利润口径：</strong>过去12个月合计利润 = 指数总市值 ÷ PE(TTM) ÷ 1亿，单位为亿元。它表示指数覆盖公司的隐含滚动净利润总额，适合观察整体公司利润规模的长期变化。</div>
@@ -172,7 +172,7 @@ function htmlTemplate(data, echartsSource) {
 <script>${echartsSource}</script>
 <script>
 const DATA = ${dataJson};
-const COLORS = { sh: "#ff5d73", sz: "#36c2ff" };
+const COLORS = { sh: "#ff5d73", sz: "#36c2ff", volume: "#5cdbad", amount: "#f6c85f" };
 const fmt = (n, digits = 2) => Number(n).toLocaleString("zh-CN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const signed = (n) => (n >= 0 ? "+" : "") + fmt(n, 1) + "%";
 const cards = [
@@ -191,6 +191,7 @@ document.getElementById("cards").innerHTML = cards.map(([label, value, meta, cls
 const chart = echarts.init(document.getElementById("chart"), null, { renderer: "canvas" });
 const visibleMarkets = { sh: true, sz: true };
 let activeYears = 20;
+let zoomRange = null;
 const topDates = [
   { xAxis: "2007-10-16", name: "2007顶" },
   { xAxis: "2009-08-04", name: "2009顶" },
@@ -226,9 +227,15 @@ function visibleSeries() {
     result.push(series("深证合计利润", DATA.sz, "profit", 1, 1, COLORS.sz));
     result.push(series("深证PE(TTM)", DATA.sz, "pe", 2, 2, COLORS.sz));
   }
+  result.push(series("交易量", DATA.trading, "volume", 3, 3, COLORS.volume));
+  result.push(series("交易额", DATA.trading, "amount", 3, 4, COLORS.amount));
   return result;
 }
 function rowsInActiveRange(rows) {
+  if (zoomRange) return rows.filter(row => {
+    const time = Date.parse(row.date);
+    return time >= zoomRange[0] && time <= zoomRange[1];
+  });
   if (!activeYears) return rows;
   const end = new Date("${END}T00:00:00Z");
   const start = new Date(end);
@@ -236,6 +243,7 @@ function rowsInActiveRange(rows) {
   return rows.filter(row => row.date >= start.toISOString().slice(0, 10) && row.date <= "${END}");
 }
 function visibleValues(field) {
+  if (field === "volume" || field === "amount") return rowsInActiveRange(DATA.trading).map(row => row[field]).filter(Number.isFinite);
   const values = [];
   if (visibleMarkets.sh) values.push(...rowsInActiveRange(DATA.sh).map(row => row[field]));
   if (visibleMarkets.sz) values.push(...rowsInActiveRange(DATA.sz).map(row => row[field]));
@@ -255,16 +263,18 @@ function overviewYAxis() {
   const profit = axisBounds("profit", 0.10);
   const pe = axisBounds("pe", 0.10);
   return [
-    { type: "value", gridIndex: 0, scale: true, ...price, axisLabel: { color: "#7890aa" }, splitLine: { lineStyle: { color: "#17283d" } } },
-    { type: "value", gridIndex: 1, scale: true, ...profit, axisLabel: { color: "#7890aa", formatter: "{value}亿" }, splitLine: { lineStyle: { color: "#17283d" } } },
-    { type: "value", gridIndex: 2, scale: true, ...pe, axisLabel: { color: "#7890aa", formatter: "{value}x" }, splitLine: { lineStyle: { color: "#17283d" } } }
+    { type: "value", gridIndex: 0, scale: true, ...price, axisLabel: { color: "#7890aa", formatter: value => fmt(value, 0) }, splitLine: { lineStyle: { color: "#17283d" } } },
+    { type: "value", gridIndex: 1, scale: true, ...profit, axisLabel: { color: "#7890aa", formatter: value => fmt(value, 0) }, splitLine: { lineStyle: { color: "#17283d" } } },
+    { type: "value", gridIndex: 2, scale: true, ...pe, axisLabel: { color: "#7890aa", formatter: value => fmt(value, 1) + "x" }, splitLine: { lineStyle: { color: "#17283d" } } },
+    { type: "value", gridIndex: 3, scale: true, ...axisBounds("volume"), name: "亿股", nameTextStyle: { color: COLORS.volume }, axisLabel: { color: COLORS.volume, formatter: value => fmt(value, 0) }, splitLine: { lineStyle: { color: "#17283d" } } },
+    { type: "value", gridIndex: 3, position: "right", scale: true, ...axisBounds("amount"), name: "亿元", nameTextStyle: { color: COLORS.amount }, axisLabel: { color: COLORS.amount, formatter: value => fmt(value, 0) }, splitLine: { show: false } }
   ];
 }
 function renderOverview() {
   chart.setOption({ series: visibleSeries(), yAxis: overviewYAxis() }, { replaceMerge: ["series", "yAxis"] });
 }
 const commonAxis = {
-  type: "time", axisLine: { lineStyle: { color: "#344760" } },
+  type: "time", min: "${START}", max: "${END}", axisLine: { lineStyle: { color: "#344760" } },
   axisLabel: { color: "#7890aa", hideOverlap: true },
   splitLine: { show: false }, axisPointer: { show: true }
 };
@@ -272,15 +282,18 @@ chart.setOption({
   animation: false,
   backgroundColor: "transparent",
   grid: [
-    { left: 72, right: 34, top: 42, height: "29%" },
-    { left: 72, right: 34, top: "38%", height: "24%" },
-    { left: 72, right: 34, top: "68%", height: "20%" }
+    { left: 72, right: 68, top: 42, height: "22%" },
+    { left: 72, right: 68, top: "31%", height: "17%" },
+    { left: 72, right: 68, top: "55%", height: "15%" },
+    { left: 72, right: 68, top: "78%", height: "15%" }
   ],
   title: [
     { text: "指数价格", left: 20, top: 12, textStyle: { color: "#edf4ff", fontSize: 13 } },
-    { text: "过去12个月合计利润（亿元）", left: 20, top: "34%", textStyle: { color: "#edf4ff", fontSize: 13 } },
-    { text: "市盈率 PE(TTM)", left: 20, top: "64%", textStyle: { color: "#edf4ff", fontSize: 13 } }
+    { text: "过去12个月合计利润（亿元）", left: 20, top: "28%", textStyle: { color: "#edf4ff", fontSize: 13 } },
+    { text: "市盈率 PE(TTM)", left: 20, top: "52%", textStyle: { color: "#edf4ff", fontSize: 13 } },
+    { text: "交易规模 · 沪深A股合计", left: 20, top: "73%", textStyle: { color: "#edf4ff", fontSize: 13 } }
   ],
+  legend: { data: ["交易量", "交易额"], top: "75%", left: "center", textStyle: { color: "#edf4ff" } },
   tooltip: {
     trigger: "axis", axisPointer: { type: "cross", link: [{ xAxisIndex: "all" }] },
     backgroundColor: "rgba(7,17,31,.96)", borderColor: "#36506f", textStyle: { color: "#edf4ff" },
@@ -290,7 +303,7 @@ chart.setOption({
         const isProfit = p.seriesName.includes("合计利润");
         const isPe = p.seriesName.includes("PE");
         const value = isProfit ? fmt(p.value[1], 0) : fmt(p.value[1]);
-        const unit = isProfit ? " 亿元" : (isPe ? "x" : "");
+        const unit = p.seriesName === "交易量" ? " 亿股" : p.seriesName === "交易额" ? " 亿元" : isProfit ? " 亿元" : (isPe ? "x" : "");
         return p.marker + p.seriesName + "：<b>" + value + unit + "</b>";
       });
       return "<b>" + date + "</b><br>" + lines.join("<br>");
@@ -300,18 +313,25 @@ chart.setOption({
   xAxis: [
     { ...commonAxis, gridIndex: 0, axisLabel: { show: false } },
     { ...commonAxis, gridIndex: 1, axisLabel: { show: false } },
-    { ...commonAxis, gridIndex: 2 }
+    { ...commonAxis, gridIndex: 2, axisLabel: { show: false } },
+    { ...commonAxis, gridIndex: 3 }
   ],
   yAxis: [
     ...overviewYAxis()
   ],
   dataZoom: [
-    { type: "inside", xAxisIndex: [0,1,2], filterMode: "none", start: 0, end: 100 },
-    { type: "slider", xAxisIndex: [0,1,2], bottom: 10, height: 24, borderColor: "#263b58",
+    { type: "inside", xAxisIndex: [0,1,2,3], filterMode: "none", start: 0, end: 100 },
+    { type: "slider", xAxisIndex: [0,1,2,3], bottom: 10, height: 24, borderColor: "#263b58",
       backgroundColor: "#0d1929", fillerColor: "rgba(246,200,95,.18)", handleStyle: { color: "#f6c85f" },
       textStyle: { color: "#8fa5bf" }, start: 0, end: 100 }
   ],
   series: visibleSeries()
+});
+chart.on("datazoom", () => {
+  const zoom = chart.getOption().dataZoom[0];
+  const start = Date.parse("${START}"), end = Date.parse("${END}");
+  zoomRange = [start + (end - start) * zoom.start / 100, start + (end - start) * zoom.end / 100];
+  chart.setOption({ yAxis: overviewYAxis() });
 });
 
 document.querySelectorAll(".market-toggle input").forEach(input => input.addEventListener("change", () => {
@@ -358,34 +378,24 @@ async function main() {
   if (!python) {
     throw new Error("Unable to find a usable Python interpreter");
   }
-  try {
-    execFileSync(python, [path.join(ROOT, "work", "fetch_market_overview_data.py")], {
-      stdio: "inherit",
-    });
-    execFileSync(python, [path.join(ROOT, "work", "fetch_official_sentiment_data.py")], {
-      stdio: "inherit",
-    });
-    execFileSync(python, [path.join(ROOT, "work", "fetch_retail_sentiment_data.py")], {
-      stdio: "inherit",
-    });
-    execFileSync(python, [path.join(ROOT, "work", "fetch_large_money_sentiment_data.py")], {
-      stdio: "inherit",
-    });
-    execFileSync(python, [path.join(ROOT, "work", "fetch_national_team_etf_data.py")], {
-      stdio: "inherit",
-    });
-    execFileSync(python, [path.join(ROOT, "work", "fetch_valuation_data.py")], {
-      stdio: "inherit",
-    });
-  } catch (error) {
-    if (!fs.existsSync(path.join(ROOT, "work", "valuation_data.json"))) throw error;
-    console.warn("Valuation refresh failed; using the existing valuation_data.json cache.");
+  if (!process.argv.includes("--skip-refresh")) {
+    for (const name of ["market_overview", "official_sentiment", "retail_sentiment", "large_money_sentiment", "national_team_etf", "valuation"]) {
+      try {
+        execFileSync(python, [path.join(ROOT, "work", "fetch_" + name + "_data.py")], { stdio: "inherit" });
+      } catch (error) {
+        if (!fs.existsSync(path.join(ROOT, "work", name + "_data.json"))) throw error;
+        console.warn(name + " refresh failed; retaining its existing dated cache.");
+      }
+    }
   }
   const overview = readMarketOverview();
-  const sh = lastByWeek(overview.sh);
-  const sz = lastByWeek(overview.sz);
+  END = overview.meta.end;
+  const inRange = rows => rows.filter(row => row.date >= START && row.date <= END);
+  const sh = lastByWeek(inRange(overview.sh));
+  const sz = lastByWeek(inRange(overview.sz));
+  const trading = lastByWeek(inRange(overview.trading));
   const echartsSource = fs.readFileSync(path.join(ROOT, "work", "echarts.min.js"), "utf8");
-  const data = { sh, sz, stats: { sh: stats(sh), sz: stats(sz) } };
+  const data = { sh, sz, trading, stats: { sh: stats(sh), sz: stats(sz) } };
   fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
   fs.writeFileSync(OUTPUT, htmlTemplate(data, echartsSource), "utf8");
   require("./add_valuation_module");

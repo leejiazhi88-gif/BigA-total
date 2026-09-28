@@ -1,45 +1,17 @@
 import calendar
 import json
-import re
-import ssl
-import urllib.request
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+from tushare_client import END_DATE, call_api, get_token
+
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = Path.home() / ".codex" / "config.toml"
 OUTPUT = ROOT / "work" / "large_money_sentiment_data.json"
 START_YEAR = 2018
-END_YEAR = 2026
-END_DATE = "20260828"
+END_YEAR = int(END_DATE[:4])
 
-
-def get_token():
-    text = CONFIG.read_text(encoding="utf-8")
-    match = re.search(r"https://api\.tushare\.pro/mcp/\?token=([^\"'&\s]+)", text)
-    if not match:
-        raise RuntimeError("Tushare token was not found.")
-    return match.group(1)
-
-
-def call_api(token, api_name, params, fields):
-    payload = json.dumps(
-        {"api_name": api_name, "token": token, "params": params, "fields": fields}
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        "https://api.tushare.pro",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=90, context=ssl._create_unverified_context()) as response:
-        result = json.loads(response.read().decode("utf-8"))
-    if result.get("code") != 0:
-        raise RuntimeError(f"{api_name}: {result.get('msg')}")
-    data = result.get("data") or {}
-    return [dict(zip(data.get("fields", []), row)) for row in data.get("items", [])]
 
 
 def month_ranges():
@@ -156,9 +128,9 @@ def main():
                 "northMoney": round(north_row["northMoney"], 2)
                 if "northMoney" in north_row
                 else None,
-                "blockAmount": round(block.get("amount", 0), 2),
-                "institutionBlockNet": round(block.get("instNet", 0), 2),
-                "holderNetShares": round(holder.get("netShares", 0), 4),
+                "blockAmount": round(block["amount"], 2) if block else None,
+                "institutionBlockNet": round(block["instNet"], 2) if block else None,
+                "holderNetShares": round(holder["netShares"], 4) if holder else None,
             }
         )
 

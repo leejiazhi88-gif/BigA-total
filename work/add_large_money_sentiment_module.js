@@ -153,7 +153,7 @@ const script = `
       document.getElementById("largeMoneyMetricSubtitle").textContent = cfg.subtitle;
       document.getElementById("largeMoneyMetricNote").textContent = cfg.note;
       document.getElementById("largeMoneyLatestReading").textContent =
-        "最新：" + fmt(latest, cfg.digits) + cfg.unit;
+        (points[points.length - 1]?.[0] || "暂无") + "：" + fmt(latest, cfg.digits) + cfg.unit;
       chart.setOption({
         animation: false, backgroundColor: "transparent",
         grid: { left: 72, right: 28, top: 42, bottom: 64 },

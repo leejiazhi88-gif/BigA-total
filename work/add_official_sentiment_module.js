@@ -188,7 +188,7 @@ const script = `
       document.getElementById("officialMetricSubtitle").textContent = cfg.subtitle;
       document.getElementById("officialMetricNote").textContent = cfg.note;
       document.getElementById("officialLatestReading").textContent =
-        "最新：" + fmt(latest, cfg.digits) + cfg.unit;
+        (points[points.length - 1]?.[0] || "暂无") + "：" + fmt(latest, cfg.digits) + cfg.unit;
       chart.setOption({
         animation: false, backgroundColor: "transparent",
         grid: { left: 72, right: 28, top: 42, bottom: 64 },

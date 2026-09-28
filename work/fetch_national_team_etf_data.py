@@ -1,17 +1,22 @@
 import json
 import math
 import re
-import ssl
-import urllib.request
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
+from tushare_client import END_DATE, call_api, get_token
+
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = Path.home() / ".codex" / "config.toml"
 OUTPUT = ROOT / "work" / "national_team_etf_data.json"
-PERIOD = "20260331"
+refresh_year = int(END_DATE[:4])
+refresh_month_day = END_DATE[4:]
+PERIOD = (f"{refresh_year}0930" if refresh_month_day >= "1101" else
+          f"{refresh_year}0630" if refresh_month_day >= "0901" else
+          f"{refresh_year}0331" if refresh_month_day >= "0501" else
+          f"{refresh_year - 1}0930")
 HISTORY_PERIODS = [
     "20150630",
     "20150831",
@@ -22,6 +27,7 @@ HISTORY_PERIODS = [
     "20250331",
     "20260331",
 ]
+HISTORY_PERIODS = sorted(set(HISTORY_PERIODS + [PERIOD]))
 
 ETF_POOL = [
     {"ts_code": "510050.SH", "name": "华夏上证50ETF", "group": "宽基大盘"},
@@ -64,32 +70,6 @@ NATIONAL_TEAM_PATTERNS = [
     "汇金资产",
 ]
 
-
-def get_token():
-    text = CONFIG.read_text(encoding="utf-8")
-    match = re.search(r"https://api\.tushare\.pro/mcp/\?token=([^\"'&\s]+)", text)
-    if not match:
-        raise RuntimeError("Tushare token was not found.")
-    return match.group(1)
-
-
-def call_api(token, api_name, params, fields):
-    payload = json.dumps(
-        {"api_name": api_name, "token": token, "params": params, "fields": fields}
-    ).encode("utf-8")
-    request = urllib.request.Request(
-        "https://api.tushare.pro",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    context = ssl._create_unverified_context()
-    with urllib.request.urlopen(request, timeout=90, context=context) as response:
-        result = json.loads(response.read().decode("utf-8"))
-    if result.get("code") != 0:
-        raise RuntimeError(f"{api_name}: {result.get('msg')}")
-    data = result.get("data") or {}
-    return [dict(zip(data.get("fields", []), row)) for row in data.get("items", [])]
 
 
 def is_national_team(holder_name):
@@ -227,6 +207,8 @@ def main():
             "ts_code,ann_date,end_date,symbol,mkv,amount,stk_mkv_ratio,stk_float_ratio",
         )
         holdings = normalized_holdings(rows)
+        if not holdings:
+            raise RuntimeError(f"No disclosed holdings for {etf['ts_code']} in {PERIOD}; retaining previous dataset.")
         symbols.update(row["symbol"] for row in holdings)
         etfs.append({**etf, "holdings": holdings, "rawRows": len(rows)})
 
@@ -234,13 +216,23 @@ def main():
 
     holder_exposure = {}
     holder_details = {}
-    for symbol in sorted(symbols):
+    def fetch_holders(symbol):
+        time.sleep(0.4)
         holders = call_api(
             token,
             "top10_floatholders",
             {"ts_code": symbol, "period": PERIOD},
             "ts_code,ann_date,end_date,holder_name,hold_amount,hold_ratio,hold_float_ratio,holder_type",
         )
+        return symbol, holders
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        holder_results = []
+        for result in executor.map(fetch_holders, sorted(symbols)):
+            holder_results.append(result)
+            if len(holder_results) % 100 == 0:
+                print(f"Checked {len(holder_results)}/{len(symbols)} disclosed stock holders", flush=True)
+    for symbol, holders in holder_results:
         matched = [row for row in holders if is_national_team(row.get("holder_name"))]
         exposure = sum(float(row.get("hold_float_ratio") or 0) for row in matched)
         holder_exposure[symbol] = exposure / 100

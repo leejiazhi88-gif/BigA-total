@@ -51,7 +51,7 @@ const moduleHtml = `
         <h2>国家队-ETF暴露</h2>
         <p>选取主要 A 股指数 ETF，用披露持仓聚类，并估算底层股票中国家队前十大流通股东暴露比例。</p>
       </div>
-      <div class="module-status" id="nationalTeamEtfStatus">2026Q1 披露持仓样本</div>
+      <div class="module-status" id="nationalTeamEtfStatus">披露持仓样本</div>
     </div>
 
     <div class="nt-etf-grid">

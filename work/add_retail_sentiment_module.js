@@ -168,7 +168,7 @@ const script = `
       document.getElementById("retailMetricSubtitle").textContent = cfg.subtitle;
       document.getElementById("retailMetricNote").textContent = cfg.note;
       document.getElementById("retailLatestReading").textContent =
-        "最新：" + fmt(latest, cfg.digits) + cfg.unit;
+        (points[points.length - 1]?.[0] || "暂无") + "：" + fmt(latest, cfg.digits) + cfg.unit;
       chart.setOption({
         animation: false,
         backgroundColor: "transparent",

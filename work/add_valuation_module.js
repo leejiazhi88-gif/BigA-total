@@ -22,13 +22,13 @@ const css = `
   <style id="valuation-module-style">
     .page-nav {
       position: sticky; top: 0; z-index: 20; display: flex; gap: 8px;
-      width: fit-content; margin: 0 0 20px; padding: 6px;
+      width: fit-content; max-width: 100%; overflow-x: auto; margin: 0 0 20px; padding: 6px;
       border: 1px solid var(--line); border-radius: 12px;
       background: rgba(7,17,31,.92); backdrop-filter: blur(12px);
     }
     .page-nav a {
       color: var(--muted); padding: 8px 14px; border-radius: 8px;
-      text-decoration: none; font-size: 13px; font-weight: 700;
+      text-decoration: none; font-size: 13px; font-weight: 700; white-space: nowrap; flex-shrink: 0;
     }
     .page-nav a:hover, .page-nav a.active { color: #07111f; background: var(--accent); }
     .module-shell { margin-top: 54px; scroll-margin-top: 72px; }
@@ -73,7 +73,7 @@ const css = `
       display: flex; justify-content: space-between; gap: 12px; align-items: center;
       color: var(--muted); font-size: 11px; padding: 9px 16px 0;
     }
-    .metric-reading { color: var(--text); font-weight: 700; white-space: nowrap; }
+    .metric-reading { color: var(--text); font-weight: 700; }
     #valuationChart { height: 500px; width: 100%; }
     .event-controls { display: flex; gap: 8px; }
     .event-select {
@@ -438,12 +438,15 @@ const js = `
       const szPoints = valuationPoints("sz", activeMetric);
       const shLatest = shPoints[shPoints.length - 1]?.[1];
       const szLatest = szPoints[szPoints.length - 1]?.[1];
+      const latestDate = shPoints[shPoints.length - 1]?.[0] || "暂无";
       const rangeLabel = activeYears ? activeYears + "年" : "全部可用";
       document.getElementById("valuationMetricSubtitle").textContent =
         cfg.fixedRange ? cfg.subtitle + "（" + rangeLabel + "样本动态计算）" : cfg.subtitle;
-      document.getElementById("valuationMetricNote").textContent = cfg.note;
+      document.getElementById("valuationMetricNote").textContent = cfg.note +
+        (activeMetric === "equityBondSpread" && valuationExtra.meta.bondStatus !== "refreshed"
+          ? " 国债收益率暂不能刷新，股债收益差保留截至 " + latestDate + " 的历史数据。PE与PB已独立更新。" : "");
       document.getElementById("valuationLatestReading").textContent =
-        "最新：上证 " + fmt(shLatest, 2) + cfg.unit + " / 深证 " + fmt(szLatest, 2) + cfg.unit;
+        latestDate + "：上证 " + fmt(shLatest, 2) + cfg.unit + " / 深证 " + fmt(szLatest, 2) + cfg.unit;
 
       const riskArea = cfg.fixedRange ? {
         silent: true,
